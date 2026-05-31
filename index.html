@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
+  <meta name="theme-color" content="#78101d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Concordia" />
+  <title>Det sker i Concordia</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="chainmark" aria-hidden="true">⛓</div>
+      <h1>Det sker i Concordia</h1>
+      <p>Intern side for brødre – del ikke offentligt</p>
+      <button id="installBtn" class="install-btn" hidden>Installer app</button>
+    </header>
+
+    <main id="viewOverview" class="view active-view">
+      <section class="next-block">
+        <div class="section-title"><span></span><h2>Næste arrangement</h2></div>
+        <div id="nextEvent"></div>
+      </section>
+
+      <section class="list-block">
+        <div class="list-head">
+          <div class="section-title"><span></span><h2>Kommende aktiviteter</h2></div>
+          <select id="filterSelect" aria-label="Filtrer arrangementer">
+            <option value="all">Alle</option>
+            <option value="internal">Interne</option>
+            <option value="public">Offentlige</option>
+          </select>
+        </div>
+        <div id="eventList" class="event-list"></div>
+      </section>
+    </main>
+
+    <main id="viewCalendar" class="view">
+      <section class="page-card">
+        <div class="section-title"><span></span><h2>Kalender</h2></div>
+        <div id="calendarList" class="calendar-list"></div>
+      </section>
+    </main>
+
+    <main id="viewAbout" class="view">
+      <section class="page-card">
+        <div class="section-title"><span></span><h2>Om siden</h2></div>
+        <p>Denne webapp er lavet som en intern oversigt over sociale aktiviteter og arrangementer i Concordia.</p>
+        <p>Almindelige logeaftener hører fortsat hjemme i tilmeldingssystemet. Denne side er til fodbold, loppemarked, særarrangementer og lignende.</p>
+        <p class="warning">Intern side for brødre – del ikke offentligt.</p>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Navigation">
+      <button class="nav-btn active" data-view="overview"><span>▦</span><small>Oversigt</small></button>
+      <button class="nav-btn" data-view="calendar"><span>□</span><small>Kalender</small></button>
+      <button class="nav-btn" data-view="about"><span>ⓘ</span><small>Om siden</small></button>
+    </nav>
+  </div>
+
+  <dialog id="eventModal" class="sheet-dialog">
+    <div class="sheet">
+      <button class="close" data-close aria-label="Luk">×</button>
+      <div id="modalContent"></div>
+    </div>
+  </dialog>
+
+  <dialog id="posterModal" class="poster-dialog">
+    <header class="poster-topbar">
+      <button data-poster-close aria-label="Luk">×</button>
+      <strong id="posterTitle">Plakat</strong>
+      <button data-zoom-reset>1:1</button>
+    </header>
+    <div class="poster-stage" id="posterStage">
+      <img id="posterImage" alt="Plakat" />
+    </div>
+    <div class="poster-help">Zoom med fingerspænd eller dobbelttryk</div>
+  </dialog>
+
+  <script src="app.js"></script>
+
+</body>
+</html>
