@@ -56,7 +56,7 @@ function renderCalendar(){let html=''; let current=''; for(const e of upcoming()
 window.openEvent = function(id){
   const e=byId(id);
   modalContent.innerHTML = `
-    <div class="detail-poster-wrap" onclick="openPoster('${e.id}')" aria-label="Tryk for zoom">
+    <div class="detail-poster-wrap">
       <img class="detail-poster" src="${e.poster}" alt="${e.title} plakat">
     </div>
     <h2 class="modal-title">${e.icon} ${e.title}</h2>
