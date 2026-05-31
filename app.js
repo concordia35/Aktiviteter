@@ -46,3 +46,170 @@ posterImage.addEventListener('dblclick',()=>{zoom = zoom === 1 ? 1.8 : 1; poster
 $$('.nav-btn').forEach(btn=>btn.addEventListener('click',()=>{const v=btn.dataset.view; $$('.nav-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); $$('.view').forEach(view=>view.classList.remove('active-view')); $('#view'+v[0].toUpperCase()+v.slice(1)).classList.add('active-view'); window.scrollTo({top:0,behavior:'smooth'});}));
 let deferredPrompt; const installBtn=$('#installBtn'); window.addEventListener('beforeinstallprompt',e=>{e.preventDefault(); deferredPrompt=e; installBtn.hidden=false;}); installBtn.addEventListener('click',async()=>{if(!deferredPrompt)return; deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; installBtn.hidden=true;}); if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));}
 renderHero(); renderList(); renderCalendar();
+
+
+
+/* V7: Pinch-to-zoom poster viewer */
+(() => {
+  const overlay = document.getElementById("posterZoomOverlay");
+  const viewport = document.getElementById("posterZoomViewport");
+  const img = document.getElementById("posterZoomImage");
+  const closeBtn = document.getElementById("posterZoomClose");
+  if (!overlay || !viewport || !img || !closeBtn) return;
+
+  let scale = 1;
+  let minScale = 1;
+  let maxScale = 5;
+  let x = 0;
+  let y = 0;
+  let startX = 0;
+  let startY = 0;
+  let startScale = 1;
+  let startDistance = 0;
+  let startMid = { x: 0, y: 0 };
+  let lastTap = 0;
+  let active = false;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function applyTransform() {
+    img.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+  }
+
+  function resetTransform() {
+    scale = 1;
+    x = 0;
+    y = 0;
+    applyTransform();
+  }
+
+  function distance(t1, t2) {
+    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  }
+
+  function midpoint(t1, t2) {
+    return {
+      x: (t1.clientX + t2.clientX) / 2,
+      y: (t1.clientY + t2.clientY) / 2
+    };
+  }
+
+  function openPoster(src, alt = "Plakat") {
+    if (!src) return;
+    img.src = src;
+    img.alt = alt || "Plakat";
+    overlay.classList.add("is-open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    resetTransform();
+  }
+
+  function closePoster() {
+    overlay.classList.remove("is-open");
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    img.removeAttribute("src");
+    resetTransform();
+  }
+
+  closeBtn.addEventListener("click", closePoster);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closePoster();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("is-open")) closePoster();
+  });
+
+  viewport.addEventListener("touchstart", (e) => {
+    if (!overlay.classList.contains("is-open")) return;
+    active = true;
+
+    if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 280) {
+        resetTransform();
+        e.preventDefault();
+        lastTap = 0;
+        return;
+      }
+      lastTap = now;
+      startX = e.touches[0].clientX - x;
+      startY = e.touches[0].clientY - y;
+    }
+
+    if (e.touches.length === 2) {
+      startDistance = distance(e.touches[0], e.touches[1]);
+      startScale = scale;
+      startMid = midpoint(e.touches[0], e.touches[1]);
+    }
+  }, { passive: false });
+
+  viewport.addEventListener("touchmove", (e) => {
+    if (!active || !overlay.classList.contains("is-open")) return;
+    e.preventDefault();
+
+    if (e.touches.length === 1 && scale > 1) {
+      x = e.touches[0].clientX - startX;
+      y = e.touches[0].clientY - startY;
+      applyTransform();
+    }
+
+    if (e.touches.length === 2) {
+      const newDistance = distance(e.touches[0], e.touches[1]);
+      const mid = midpoint(e.touches[0], e.touches[1]);
+      const nextScale = clamp(startScale * (newDistance / startDistance), minScale, maxScale);
+
+      // Keep the pinch midpoint roughly stable
+      const scaleRatio = nextScale / scale;
+      x = mid.x - (mid.x - x) * scaleRatio + (mid.x - startMid.x);
+      y = mid.y - (mid.y - y) * scaleRatio + (mid.y - startMid.y);
+
+      scale = nextScale;
+      applyTransform();
+    }
+  }, { passive: false });
+
+  viewport.addEventListener("touchend", (e) => {
+    if (e.touches.length === 0) {
+      active = false;
+      if (scale <= 1.02) resetTransform();
+    }
+  }, { passive: false });
+
+  // Mouse wheel zoom for desktop testing
+  viewport.addEventListener("wheel", (e) => {
+    if (!overlay.classList.contains("is-open")) return;
+    e.preventDefault();
+    const oldScale = scale;
+    const delta = e.deltaY < 0 ? 1.12 : 0.88;
+    scale = clamp(scale * delta, minScale, maxScale);
+    const ratio = scale / oldScale;
+    x = e.clientX - (e.clientX - x) * ratio;
+    y = e.clientY - (e.clientY - y) * ratio;
+    applyTransform();
+  }, { passive: false });
+
+  // Broad hook: any element with poster-ish attributes/classes opens here.
+  document.addEventListener("click", (e) => {
+    const target = e.target.closest("[data-poster], [data-poster-src], [data-show-poster], .poster-thumb, .poster-button, .poster-link, .view-poster, .show-poster");
+    if (!target) return;
+
+    const src =
+      target.dataset.poster ||
+      target.dataset.posterSrc ||
+      target.dataset.showPoster ||
+      target.getAttribute("href") ||
+      (target.tagName === "IMG" ? target.src : null) ||
+      target.querySelector("img")?.src;
+
+    if (!src || src === "#") return;
+    e.preventDefault();
+    e.stopPropagation();
+    openPoster(src, target.getAttribute("aria-label") || target.textContent?.trim() || "Plakat");
+  }, true);
+
+  window.openPosterZoom = openPoster;
+})();
