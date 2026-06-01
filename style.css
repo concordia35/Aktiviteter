@@ -233,3 +233,69 @@ summary{font-weight:900;color:var(--red);cursor:pointer}
     max-height: 90svh !important;
   }
 }
+
+
+/* V23 - brugerens egne plakater og kædeled */
+.chainmark-img {
+  width: 112px !important;
+  max-width: 34vw !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin: 0 auto 8px !important;
+  mix-blend-mode: multiply;
+}
+
+.sheet-dialog {
+  border-radius: 30px !important;
+  overflow: visible !important;
+}
+
+.sheet {
+  border-radius: 30px !important;
+  overflow: auto !important;
+  max-height: 88svh !important;
+  margin: 0 12px !important;
+  padding-bottom: 30px !important;
+}
+
+.detail-poster-wrap,
+.detail-poster,
+.participants-box,
+.event-card,
+.next-card,
+.page-card,
+.empty {
+  border-radius: 24px !important;
+}
+
+.detail-poster-wrap {
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+.detail-poster {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+.participant-count {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  margin-top: 7px !important;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(120,16,29,.08);
+  color: var(--red) !important;
+  font-weight: 900 !important;
+}
+
+@media (max-width: 520px) {
+  .sheet {
+    margin: 0 8px !important;
+    max-height: 90svh !important;
+  }
+}

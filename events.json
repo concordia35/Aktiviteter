@@ -10,7 +10,7 @@
     "end": "23:30",
     "timeText": "Dørene åbner kl. 20.00 · Kampstart kl. 21.00",
     "place": "Logen, Frederiksgade 15, Slagelse",
-    "poster": "assets/vm-aabningskamp-2026.svg",
+    "poster": "assets/vm-aabningskamp-2026.png",
     "text": "Uformel fodboldaften med kamp på storskærm, chips, hygge og mulighed for at købe øl og vand i baren. Tag gerne en ledsager med."
   },
   {
@@ -24,7 +24,7 @@
     "end": "23:30",
     "timeText": "Dørene åbner kl. 20.00 · Kampstart kl. 21.00",
     "place": "Logen, Frederiksgade 15, Slagelse",
-    "poster": "assets/vm-gruppekamp-2026.svg",
+    "poster": "assets/vm-gruppekamp-2026.png",
     "text": "Endnu en uformel VM-aften i logen med storskærm, chips og god stemning. Øl og vand kan købes i baren."
   },
   {
@@ -38,7 +38,7 @@
     "end": "23:59",
     "timeText": "Dørene åbner kl. 20.00 · Kampstart kl. 21.00",
     "place": "Logen, Frederiksgade 15, Slagelse",
-    "poster": "assets/vm-finale-2026.svg",
+    "poster": "assets/vm-finale-2026.png",
     "text": "Finaleaften i logen med storskærm, chips og hygge. Øl og vand kan købes i baren. Tag gerne en ledsager med."
   },
   {
