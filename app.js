@@ -23,9 +23,12 @@ const suggestInitiativeBtn = $('#suggestInitiativeBtn');
 let events = [];
 let logeaftener = [];
 let initiativer = [];
+let participants = [];
 let currentFilter = 'all';
 
 const INITIATIVE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRkJKdrVC23QTs_9qcuTQ51jFl1z5-nOUgVIFhKwzlB99CXgLHK3uJjyOz4f-_nJeMxpF6FynIlyvLx/pub?output=csv';
+const PARTICIPANTS_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2gW_OJRwMUK0qo7thrEiiqLj3rcWCKlZcl-4mjo6tkMmuRyNdyD_nGOwzGlFMPccQ-HytwFJfNI80/pub?output=csv';
+const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/1QazCOa3-Xd2UfnDAIxLU8IbGOnHqSvNo-1k0-oUaDsI/viewform';
 const INITIATIVE_FORM_URL = 'https://docs.google.com/forms/d/1QazCOa3-Xd2UfnDAIxLU8IbGOnHqSvNo-1k0-oUaDsI/viewform';
 
 function todayMidnight(){
@@ -270,30 +273,72 @@ function upcomingInitiatives(){ return sortByDate(initiativer).filter(isUpcoming
 function pastInitiatives(){ return sortByDate(initiativer).filter(e => !isUpcoming(e)).reverse(); }
 function initiativeById(id){ return initiativer.find(e => e.id === id); }
 
+
+function normalizeKey(value){
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ');
+}
+
+function participantActivityValue(row){
+  return row.activity || row.aktivitet || row['Hvilken aktivitet?'] || row['Aktivitet'] || row['Titel på aktiviteten'] || row['Titel'] || '';
+}
+
+function participantNameValue(row){
+  return row.name || row.navn || row['Dit navn'] || row['Navn'] || row['Navn på kontaktperson'] || '';
+}
+
+function participantsFor(initiative){
+  const possible = [
+    initiative.id,
+    initiative.title,
+    initiative.title + ' - ' + (initiative.date || ''),
+    initiative.title + ' – ' + (initiative.date || '')
+  ].map(normalizeKey);
+
+  const names = participants
+    .filter(p => possible.includes(normalizeKey(p.activity)))
+    .map(p => p.name)
+    .filter(Boolean);
+
+  return [...new Set(names)];
+}
+
 function renderInitiatives(){
   if(!initiativeList) return;
   const items = upcomingInitiatives();
-  initiativeList.innerHTML = items.length ? items.map(e => `
+  initiativeList.innerHTML = items.length ? items.map(e => {
+    const names = participantsFor(e);
+    return `
     <button class="event-card" onclick="openInitiative('${e.id}')">
       <div class="event-icon">${e.icon || '🤝'}</div>
-      <div><h3>${e.title}</h3><p><strong>${e.host || ''}</strong><br>${daDate(e.date,false)}${e.time ? ' · kl. ' + e.time : ''}</p></div>
+      <div><h3>${e.title}</h3><p><strong>${e.host || ''}</strong><br>${daDate(e.date,false)}${e.time ? ' · kl. ' + e.time : ''}<br><span class="participant-count">👥 ${names.length} deltager${names.length === 1 ? '' : 'e'}</span></p></div>
       <div class="chev">›</div>
-    </button>`).join('') : `<div class="empty">Ingen godkendte initiativer lige nu.</div>`;
+    </button>`}).join('') : `<div class="empty">Ingen godkendte initiativer lige nu.</div>`;
 
   const old = pastInitiatives();
   if(pastInitiativeBlock && pastInitiativeList){
     pastInitiativeBlock.hidden = old.length === 0;
-    pastInitiativeList.innerHTML = old.map(e => `
+    pastInitiativeList.innerHTML = old.map(e => {
+      const names = participantsFor(e);
+      return `
       <button class="event-card muted-card" onclick="openInitiative('${e.id}')">
         <div class="event-icon">${e.icon || '🤝'}</div>
-        <div><h3>${e.title}</h3><p><strong>${e.host || ''}</strong><br>${daDate(e.date,false)}</p></div>
+        <div><h3>${e.title}</h3><p><strong>${e.host || ''}</strong><br>${daDate(e.date,false)}<br><span class="participant-count">👥 ${names.length} deltager${names.length === 1 ? '' : 'e'}</span></p></div>
         <div class="chev">›</div>
-      </button>`).join('');
+      </button>`}).join('');
   }
 }
 
 window.openInitiative = function(id){
   const e = initiativeById(id); if(!e) return;
+  const names = participantsFor(e);
+  const participantList = names.length
+    ? `<div class="participants-box"><h3>Deltagere (${names.length})</h3><ul>${names.map(n => `<li>✓ ${n}</li>`).join('')}</ul></div>`
+    : `<div class="participants-box"><h3>Deltagere</h3><p>Ingen har skrevet sig på endnu.</p></div>`;
+
   modalContent.innerHTML = `
     <div class="loge-detail-icon">${e.icon || '🤝'}</div>
     <h2 class="modal-title">${e.title}</h2>
@@ -303,7 +348,12 @@ window.openInitiative = function(id){
       <div class="info-row"><span>🕘</span><div>${e.time ? 'Kl. ' + e.time : 'Tidspunkt ikke angivet'}</div></div>
       <div class="info-row"><span>📍</span><div>${e.place || 'Sted ikke angivet'}</div></div>
     </div>
-    <p class="description">${e.text || ''}</p>`;
+    <p class="description">${e.text || ''}</p>
+    ${participantList}
+    <div class="modal-actions">
+      <a class="btn primary" href="${PARTICIPATION_FORM_URL}" target="_blank" rel="noopener">Jeg deltager</a>
+    </div>
+    <p class="sheet-status-note">Skriv aktivitetens titel og dit navn i formularen.</p>`;
   modal.showModal();
 }
 
@@ -418,6 +468,27 @@ async function loadInitiativesFromSheet(){
     .filter(e => e.title && e.date);
 }
 
+async function loadParticipantsFromSheet(){
+  const res = await fetch(PARTICIPANTS_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
+  if(!res.ok) throw new Error('Deltagerliste kunne ikke indlæses');
+
+  const csv = await res.text();
+  const rows = parseCsv(csv);
+  if(rows.length < 2) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1)
+    .map(row => {
+      const r = rowToObject(headers, row);
+      return {
+        activity: participantActivityValue(r),
+        name: participantNameValue(r)
+      };
+    })
+    .filter(p => p.activity && p.name);
+}
+
+
 function renderAll(){
   renderEventHero();
   renderEventList();
@@ -427,7 +498,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=19', {cache:'no-store'});
+  const res = await fetch(path + '?v=20', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
@@ -457,6 +528,14 @@ async function init(){
   }catch(err){
     console.warn('Kunne ikke indlæse initiativer fra Google Sheets:', err);
     initiativer = [];
+  }
+
+  try{
+    participants = await loadParticipantsFromSheet();
+    if(!Array.isArray(participants)) participants = [];
+  }catch(err){
+    console.warn('Kunne ikke indlæse deltagere fra Google Sheets:', err);
+    participants = [];
   }
 
   renderAll();
