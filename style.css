@@ -299,3 +299,21 @@ summary{font-weight:900;color:var(--red);cursor:pointer}
     max-height: 90svh !important;
   }
 }
+
+
+/* V24 - tving rigtige kædeled i header */
+.app-header .chainmark,
+.app-header .chainmark:not(img) {
+  display: none !important;
+}
+
+.app-header .chainmark-img {
+  display: block !important;
+  width: 96px !important;
+  max-width: 32vw !important;
+  height: auto !important;
+  margin: 0 auto 8px !important;
+  object-fit: contain !important;
+  filter: none !important;
+  mix-blend-mode: multiply;
+}

@@ -531,7 +531,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=23', {cache:'no-store'});
+  const res = await fetch(path + '?v=24', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
