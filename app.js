@@ -28,7 +28,7 @@ let currentFilter = 'all';
 
 const INITIATIVE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRkJKdrVC23QTs_9qcuTQ51jFl1z5-nOUgVIFhKwzlB99CXgLHK3uJjyOz4f-_nJeMxpF6FynIlyvLx/pub?output=csv';
 const PARTICIPANTS_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2gW_OJRwMUK0qo7thrEiiqLj3rcWCKlZcl-4mjo6tkMmuRyNdyD_nGOwzGlFMPccQ-HytwFJfNI80/pub?output=csv';
-const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfvSDx6diX77ZzmuZTMGRPvKFZ4B_wb-EKYFfOXYQtDNiMiUQ/viewform?usp=dialog';
+const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfvSDx6diX77ZzmuZTMGRPvKFZ4B_wb-EKYFfOXYQtDNiMiUQ/viewform';
 const INITIATIVE_FORM_URL = 'https://docs.google.com/forms/d/1QazCOa3-Xd2UfnDAIxLU8IbGOnHqSvNo-1k0-oUaDsI/viewform';
 
 function todayMidnight(){
