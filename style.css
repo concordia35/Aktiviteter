@@ -180,3 +180,56 @@ summary{font-weight:900;color:var(--red);cursor:pointer}
 .btn.soft.refresh-btn:active {
   transform: scale(.98);
 }
+
+
+/* V22 - finpudsning */
+.chainmark-img {
+  width: 88px !important;
+  height: auto !important;
+  display: block;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 4px 6px rgba(110,67,18,.18));
+}
+
+.sheet-dialog {
+  border-radius: 30px !important;
+}
+
+.sheet {
+  border-radius: 30px !important;
+  overflow: auto !important;
+  max-height: 88svh !important;
+  margin: 0 12px !important;
+  padding-bottom: 28px !important;
+}
+
+.sheet::after {
+  content: "";
+  display: block;
+  height: 2px;
+}
+
+.detail-poster-wrap {
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+.detail-poster {
+  border-radius: 24px !important;
+  background: #fff8eb;
+}
+
+/* Gør de nye VM-billeder pæne i detaljevisningen */
+.detail-poster[src$=".svg"] {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 520px) {
+  .sheet {
+    margin: 0 8px !important;
+    max-height: 90svh !important;
+  }
+}

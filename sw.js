@@ -1,4 +1,4 @@
-const CACHE_NAME = 'concordia-v21';
+const CACHE_NAME = 'concordia-v22';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,10 @@ const ASSETS = [
   './assets/sct-patricks-day-2027.png',
   './icons/icon-192.png',
   './icons/icon-512.png'
+  './assets/chainlinks.svg',
+  './assets/vm-aabningskamp-2026.svg',
+  './assets/vm-gruppekamp-2026.svg',
+  './assets/vm-finale-2026.svg',
 ];
 
 self.addEventListener('install', event => {
