@@ -305,23 +305,36 @@ function firstValue(row, keys){
   return '';
 }
 
-function sheetCsvUrl(sheetName){
-  const url = new URL(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq`);
-  url.searchParams.set('tqx', 'out:csv');
-  url.searchParams.set('sheet', sheetName);
-  url.searchParams.set('v', Date.now());
-  return url.toString();
+async function fetchAppsScriptData(force=false){
+  if(appDataCache && !force) return appDataCache;
+  if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INDSAET_DIN_APPS_SCRIPT')){
+    throw new Error('Apps Script URL mangler i app.js');
+  }
+
+  const url = new URL(APPS_SCRIPT_URL);
+  url.searchParams.set('action', 'list');
+  url.searchParams.set('t', Date.now());
+
+  const res = await fetch(url.toString(), {cache:'no-store'});
+  if(!res.ok) throw new Error('Apps Script kunne ikke hente data');
+
+  const data = await res.json();
+  if(!data || data.ok === false) throw new Error((data && data.error) || 'Apps Script returnerede fejl');
+
+  appDataCache = data;
+  return appDataCache;
 }
 
-async function fetchSheetRows(sheetName){
-  const res = await fetch(sheetCsvUrl(sheetName), {cache:'no-store'});
-  if(!res.ok) throw new Error(`${sheetName} kunne ikke indlæses fra Google Sheets`);
+function rowsFromData(data, names){
+  for(const name of names){
+    if(Array.isArray(data && data[name])) return data[name];
+  }
+  return [];
+}
 
-  const csv = await res.text();
-  const rows = parseCsv(csv);
-  if(rows.length < 2) return [];
-
-  const headers = rows[0].map(h => h.trim());
+function arrayRowsToObjects(rows){
+  if(!Array.isArray(rows) || rows.length < 2 || !Array.isArray(rows[0])) return rows || [];
+  const headers = rows[0].map(h => String(h || '').trim());
   return rows.slice(1).map(row => rowToObject(headers, row));
 }
 
@@ -380,61 +393,25 @@ function participationUrl(initiative){
 
 let appDataCache = null;
 
-function getFromAppsScript(action){
-  return new Promise((resolve, reject) => {
-    if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INDSAET_DIN_APPS_SCRIPT')){
-      reject(new Error('Apps Script URL mangler i app.js'));
-      return;
-    }
-
-    const callbackName = 'concordiaCallback_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-    const script = document.createElement('script');
-    const url = new URL(APPS_SCRIPT_URL);
-
-    url.searchParams.set('action', action);
-    url.searchParams.set('callback', callbackName);
-    url.searchParams.set('v', Date.now());
-
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('Apps Script svarede ikke'));
-    }, 12000);
-
-    function cleanup(){
-      clearTimeout(timer);
-      delete window[callbackName];
-      script.remove();
-    }
-
-    window[callbackName] = data => {
-      cleanup();
-      if(!data || data.ok === false){
-        reject(new Error((data && data.error) || 'Apps Script returnerede fejl'));
-        return;
-      }
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('Kunne ikke indlæse Apps Script'));
-    };
-
-    script.src = url.toString();
-    document.body.appendChild(script);
-  });
-}
-
 async function getAppData(force=false){
-  if(appDataCache && !force) return appDataCache;
-  appDataCache = await getFromAppsScript('getData');
-  return appDataCache;
+  return await fetchAppsScriptData(force);
 }
 
+async function loadInitiativesFromSheet(force=false){
+  const data = await getAppData(force);
+  const rows = arrayRowsToObjects(rowsFromData(data, ['initiatives', 'initiativer', 'Initiativer']));
+  return normalizeInitiatives(rows);
+}
+
+async function loadParticipantsFromSheet(force=false){
+  const data = await getAppData(force);
+  const rows = arrayRowsToObjects(rowsFromData(data, ['participants', 'deltagere', 'Deltagere', 'rows']));
+  return normalizeParticipants(rows);
+}
 
 async function refreshParticipants(){
   try{
-    participants = await loadParticipantsFromSheet();
+    participants = await loadParticipantsFromSheet(true);
     renderInitiatives();
     return true;
   }catch(err){
@@ -641,16 +618,6 @@ function normalizeParticipants(items){
     .filter(p => (p.activityId || p.activity) && p.name);
 }
 
-async function loadInitiativesFromSheet(){
-  const rows = await fetchSheetRows(INITIATIVE_SHEET_NAME);
-  const items = normalizeInitiatives(rows);
-  return items;
-}
-
-async function loadParticipantsFromSheet(){
-  const rows = await fetchSheetRows(PARTICIPANTS_SHEET_NAME);
-  return normalizeParticipants(rows);
-}
 
 
 
@@ -710,10 +677,9 @@ async function init(){
   }
 
   try{
-    [initiativer, participants] = await Promise.all([
-      loadInitiativesFromSheet(),
-      loadParticipantsFromSheet()
-    ]);
+    const sheetData = await getAppData(true);
+    initiativer = normalizeInitiatives(arrayRowsToObjects(rowsFromData(sheetData, ['initiatives', 'initiativer', 'Initiativer'])));
+    participants = normalizeParticipants(arrayRowsToObjects(rowsFromData(sheetData, ['participants', 'deltagere', 'Deltagere', 'rows'])));
   }catch(err){
     console.warn('Kunne ikke indlæse initiativdata:', err);
     initiativer = [];
