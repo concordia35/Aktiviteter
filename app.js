@@ -563,13 +563,24 @@ function isApproved(status){
 }
 
 async function loadInitiativesFromSheet(){
-  const data = await getAppData(true);
-  return Array.isArray(data.initiatives) ? data.initiatives : [];
+  try{
+    const data = await getAppData(true);
+    const items = Array.isArray(data.initiatives) ? data.initiatives : [];
+    if(items.length) return items;
+  }catch(err){
+    console.warn('Apps Script initiativer fejlede:', err);
+  }
+  return await loadInitiativesFromCsvFallback();
 }
 
 async function loadParticipantsFromSheet(){
-  const data = await getAppData();
-  return Array.isArray(data.participants) ? data.participants : [];
+  try{
+    const data = await getAppData();
+    return Array.isArray(data.participants) ? data.participants : [];
+  }catch(err){
+    console.warn('Apps Script deltagere fejlede:', err);
+    return await loadParticipantsFromCsvFallback();
+  }
 }
 
 
@@ -591,6 +602,58 @@ window.refreshInitiativeParticipants = async function(id){
   }
 }
 
+
+async function loadInitiativesFromCsvFallback(){
+  const res = await fetch(INITIATIVE_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
+  if(!res.ok) throw new Error('Google Sheets CSV kunne ikke indlæses');
+
+  const csv = await res.text();
+  const rows = parseCsv(csv);
+  if(rows.length < 2) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1)
+    .map((row, index) => {
+      const r = rowToObject(headers, row);
+      const status = r['Godkendt'] || r['Status'] || '';
+      const date = normalizeDate(r['Dato for aktiviteten']);
+      return {
+        id: 'sheet-' + index,
+        icon: '🤝',
+        status,
+        title: r['Titel på aktiviteten'] || 'Uden titel',
+        date,
+        time: normalizeTime(r['Tidspunkt']),
+        place: r['Sted'] || '',
+        host: r['Navn på kontaktperson'] || '',
+        text: r['Beskrivelse af aktiviteten'] || ''
+      };
+    })
+    .filter(e => isApproved(e.status))
+    .filter(e => e.title && e.date);
+}
+
+async function loadParticipantsFromCsvFallback(){
+  const res = await fetch(PARTICIPANTS_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
+  if(!res.ok) throw new Error('Deltagerliste kunne ikke indlæses');
+
+  const csv = await res.text();
+  const rows = parseCsv(csv);
+  if(rows.length < 2) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1)
+    .map(row => {
+      const r = rowToObject(headers, row);
+      return {
+        activity: participantActivityValue(r),
+        name: participantNameValue(r)
+      };
+    })
+    .filter(p => p.activity && p.name);
+}
+
+
 function renderAll(){
   renderEventHero();
   renderEventList();
@@ -600,7 +663,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=31', {cache:'no-store'});
+  const res = await fetch(path + '?v=32', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
@@ -631,9 +694,20 @@ async function init(){
     initiativer = Array.isArray(data.initiatives) ? data.initiatives : [];
     participants = Array.isArray(data.participants) ? data.participants : [];
   }catch(err){
-    console.warn('Kunne ikke indlæse data fra Apps Script:', err);
-    initiativer = [];
-    participants = [];
+    console.warn('Kunne ikke indlæse data fra Apps Script. Bruger CSV fallback:', err);
+    try{
+      initiativer = await loadInitiativesFromCsvFallback();
+    }catch(csvErr){
+      console.warn('Kunne ikke indlæse initiativer fra CSV:', csvErr);
+      initiativer = [];
+    }
+
+    try{
+      participants = await loadParticipantsFromCsvFallback();
+    }catch(csvErr){
+      console.warn('Kunne ikke indlæse deltagere fra CSV:', csvErr);
+      participants = [];
+    }
   }
 
   renderAll();
