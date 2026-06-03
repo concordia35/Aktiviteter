@@ -41,7 +41,7 @@ let currentFilter = 'all';
 const GOOGLE_SHEET_ID = '1QCnVFk5PzcF_3N6ONFNwzmjCUU-KzBeXFpfyueWa2Jc';
 const INITIATIVE_SHEET_NAME = 'Initiativer';
 const PARTICIPANTS_SHEET_NAME = 'Deltagere';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyDR5b7Tcd1ka28oQV3Wc-Ja1saDRvUi10KEp0KMGmaeVuWhMCXmRW1Hd7CXrpc9Fw/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzivUCgohSlZRNIFGGsa9goS12lTksr7DMmShgC_bAlJODfmOlogCjj2X6eSeBsP8lY/exec';
 const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfvSDx6diX77ZzmuZTMGRPvKFZ4B_wb-EKYFfOXYQtDNiMiUQ/viewform';
 const PARTICIPATION_ACTIVITY_ENTRY = 'entry.1746932510';
 const PARTICIPATION_NAME_ENTRY = 'entry.383752271';
@@ -394,13 +394,21 @@ async function postToAppsScript(action, payload){
     throw new Error('Apps Script URL mangler i app.js');
   }
 
-  const res = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8'
-    },
-    body: JSON.stringify({ action, ...payload })
+  // Apps Script-koden i det nye Sheet bruger doGet, så skrivning skal sendes som query params.
+  // Det undgår samtidig CORS/problemer med POST fra GitHub Pages.
+  const url = new URL(APPS_SCRIPT_URL);
+  url.searchParams.set('action', action);
+  Object.entries(payload || {}).forEach(([key, value]) => {
+    url.searchParams.set(key, value == null ? '' : String(value));
   });
+  url.searchParams.set('_', Date.now());
+
+  const res = await fetch(url.toString(), {
+    method: 'GET',
+    cache: 'no-store'
+  });
+
+  if(!res.ok) throw new Error('Apps Script HTTP ' + res.status);
 
   const data = await res.json();
   if(!(data.ok || data.success)){
