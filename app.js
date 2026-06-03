@@ -19,6 +19,17 @@ const pastInitiativeBlock = $('#pastInitiativeBlock');
 const initiativeModal = $('#initiativeModal');
 const initiativeForm = $('#initiativeForm');
 const suggestInitiativeBtn = $('#suggestInitiativeBtn');
+const initiativeSubmitModal = $('#initiativeSubmitModal');
+const initiativeSubmitForm = $('#initiativeSubmitForm');
+const initiativeSubmitStatus = $('#initiativeSubmitStatus');
+const submitInitiativeButton = $('#submitInitiativeButton');
+const joinModal = $('#joinModal');
+const joinForm = $('#joinForm');
+const joinStatus = $('#joinStatus');
+const joinSubmitButton = $('#joinSubmitButton');
+const joinActivityTitle = $('#joinActivityTitle');
+const joinActivityId = $('#joinActivityId');
+const joinActivityName = $('#joinActivityName');
 
 let events = [];
 let logeaftener = [];
@@ -27,6 +38,7 @@ let participants = [];
 let currentFilter = 'all';
 
 const INITIATIVE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRkJKdrVC23QTs_9qcuTQ51jFl1z5-nOUgVIFhKwzlB99CXgLHK3uJjyOz4f-_nJeMxpF6FynIlyvLx/pub?output=csv';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyDR5b7Tcd1ka28oQV3Wc-Ja1saDRvUi10KEp0KMGmaeVuWhMCXmRW1Hd7CXrpc9Fw/exec';
 const PARTICIPANTS_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2gW_OJRwMUK0qo7thrEiiqLj3rcWCKlZcl-4mjo6tkMmuRyNdyD_nGOwzGlFMPccQ-HytwFJfNI80/pub?output=csv';
 const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfvSDx6diX77ZzmuZTMGRPvKFZ4B_wb-EKYFfOXYQtDNiMiUQ/viewform';
 const PARTICIPATION_ACTIVITY_ENTRY = 'entry.1746932510';
@@ -285,13 +297,41 @@ function normalizeKey(value){
 }
 
 function participantActivityValue(row){
-  return row.activity || row.aktivitet || row['Hvilken aktivitet?'] || row['Aktivitet'] || row['Titel på aktiviteten'] || row['Titel'] || '';
+  return row.activityId || row['Aktivitet ID'] || row.activity || row.aktivitet || row['Hvilken aktivitet?'] || row['Aktivitet'] || row['Titel på aktiviteten'] || row['Titel'] || '';
 }
 
 function participantNameValue(row){
   return row.name || row.navn || row['Dit navn'] || row['Navn'] || row['Navn på kontaktperson'] || '';
 }
 
+
+
+async function postToAppsScript(action, payload){
+  if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INDSAET_DIN_APPS_SCRIPT')){
+    throw new Error('Apps Script URL mangler i app.js');
+  }
+  const body = new URLSearchParams();
+  body.set('action', action);
+  Object.entries(payload).forEach(([key, value]) => body.set(key, value ?? ''));
+  const res = await fetch(APPS_SCRIPT_URL, { method:'POST', body });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { ok:false, error:text }; }
+  if(!res.ok || !data.ok) throw new Error(data.error || 'Kunne ikke sende data');
+  return data;
+}
+
+function openJoinDialog(initiative){
+  if(!joinModal) return;
+  joinActivityId.value = initiative.id || '';
+  joinActivityName.value = initiative.title || '';
+  joinActivityTitle.textContent = `Du tilmelder dig: ${initiative.title}`;
+  joinStatus.textContent = '';
+  joinForm.reset();
+  joinActivityId.value = initiative.id || '';
+  joinActivityName.value = initiative.title || '';
+  joinModal.showModal();
+}
 
 function participationUrl(initiative){
   const url = new URL(PARTICIPATION_FORM_URL);
@@ -372,9 +412,9 @@ window.openInitiative = function(id){
     <p class="description">${e.text || ''}</p>
     ${participantList}
     <div class="modal-actions">
-      <a class="btn primary" href="${participationUrl(e)}" target="_blank" rel="noopener">Jeg deltager</a><button class="btn soft refresh-btn" type="button" onclick="refreshInitiativeParticipants(\'${e.id}\')">Opdater deltagerliste</button>
+      <button class="btn primary" type="button" onclick="openJoinForInitiative(\'${e.id}\')">Jeg deltager</button><button class="btn soft refresh-btn" type="button" onclick="refreshInitiativeParticipants(\'${e.id}\')">Opdater deltagerliste</button>
     </div>
-    <p class="sheet-status-note">Aktiviteten er udfyldt på forhånd. Skriv kun dit navn i formularen. Tryk derefter på “Opdater deltagerliste”.</p>`;
+    <p class="sheet-status-note">Skriv dit navn direkte i appen. Deltagerlisten opdateres efter tilmelding.</p>`;
   modal.showModal();
 }
 
@@ -511,6 +551,12 @@ async function loadParticipantsFromSheet(){
 
 
 
+window.openJoinForInitiative = function(id){
+  const e = initiativeById(id);
+  if(!e) return;
+  openJoinDialog(e);
+}
+
 window.refreshInitiativeParticipants = async function(id){
   const ok = await refreshParticipants();
   if(id) openInitiative(id);
@@ -531,7 +577,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=24', {cache:'no-store'});
+  const res = await fetch(path + '?v=30', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
@@ -594,7 +640,75 @@ $$('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
 
 if(suggestInitiativeBtn){
   suggestInitiativeBtn.addEventListener('click', () => {
-    window.open(INITIATIVE_FORM_URL, '_blank', 'noopener');
+    if(initiativeSubmitStatus) initiativeSubmitStatus.textContent = '';
+    if(initiativeSubmitForm) initiativeSubmitForm.reset();
+    initiativeSubmitModal.showModal();
+  });
+}
+
+
+
+const closeSubmitInitiativeBtn = $('[data-close-submit-initiative]');
+if(closeSubmitInitiativeBtn){
+  closeSubmitInitiativeBtn.addEventListener('click', () => initiativeSubmitModal.close());
+}
+const closeJoinBtn = $('[data-close-join]');
+if(closeJoinBtn){
+  closeJoinBtn.addEventListener('click', () => joinModal.close());
+}
+
+if(initiativeSubmitForm){
+  initiativeSubmitForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const payload = {
+      title: $('#newInitiativeTitle').value.trim(),
+      date: $('#newInitiativeDate').value,
+      time: $('#newInitiativeTime').value,
+      place: $('#newInitiativePlace').value.trim(),
+      host: $('#newInitiativeHost').value.trim(),
+      text: $('#newInitiativeText').value.trim()
+    };
+    submitInitiativeButton.disabled = true;
+    initiativeSubmitStatus.textContent = 'Sender forslag...';
+    try{
+      await postToAppsScript('submitInitiative', payload);
+      initiativeSubmitStatus.textContent = '✓ Forslaget er sendt til godkendelse.';
+      initiativeSubmitForm.reset();
+      setTimeout(() => initiativeSubmitModal.close(), 1200);
+    }catch(err){
+      initiativeSubmitStatus.textContent = 'Kunne ikke sende. Tjek Apps Script URL.';
+      console.error(err);
+    }finally{
+      submitInitiativeButton.disabled = false;
+    }
+  });
+}
+
+if(joinForm){
+  joinForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const payload = {
+      activityId: joinActivityId.value,
+      activity: joinActivityName.value,
+      name: $('#joinName').value.trim()
+    };
+    joinSubmitButton.disabled = true;
+    joinStatus.textContent = 'Sender tilmelding...';
+    try{
+      await postToAppsScript('joinActivity', payload);
+      joinStatus.textContent = '✓ Du er tilmeldt.';
+      await refreshParticipants();
+      renderInitiatives();
+      setTimeout(() => {
+        joinModal.close();
+        openInitiative(payload.activityId);
+      }, 800);
+    }catch(err){
+      joinStatus.textContent = 'Kunne ikke tilmelde. Tjek Apps Script URL.';
+      console.error(err);
+    }finally{
+      joinSubmitButton.disabled = false;
+    }
   });
 }
 

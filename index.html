@@ -68,11 +68,11 @@
 
     <main id="viewInitiatives" class="view">
       <section class="next-block">
-        <div class="section-title"><span></span><h2>Uformelle aktiviteter</h2></div>
+        <div class="section-title"><span></span><h2>Brødre søger selskab</h2></div>
         <div class="page-card intro-card">
           <p>Her kan brødre foreslå mindre initiativer, f.eks. gåture, kaffe, en øl efter arbejde eller andre uformelle aktiviteter.</p>
-          <p>Forslag sendes via formularen og vises først her, når de er godkendt.</p>
-          <button id="suggestInitiativeBtn" class="btn primary wide-btn" type="button">Foreslå aktivitet</button>
+          <p>Forslag sendes direkte her fra appen og vises først, når de er godkendt.</p>
+          <button id="suggestInitiativeBtn" class="btn primary wide-btn" type="button">Foreslå initiativ</button>
         </div>
       </section>
       <section class="list-block">
@@ -113,7 +113,7 @@
   <dialog id="initiativeModal" class="sheet-dialog">
     <div class="sheet">
       <button class="close" data-close-initiative aria-label="Luk">×</button>
-      <div class="section-title"><span></span><h2>Foreslå aktivitet</h2></div>
+      <div class="section-title"><span></span><h2>Foreslå initiativ</h2></div>
       <p class="form-help">Udfyld felterne. Når du trykker send, bliver forslaget sendt til Lars på mail. Aktiviteten kommer først på siden, når den er godkendt.</p>
       <form id="initiativeForm" class="initiative-form">
         <label>Titel<input id="initiativeTitle" type="text" placeholder="F.eks. Gåtur i Lystskoven" required></label>
@@ -123,6 +123,39 @@
         <label>Navn<input id="initiativeHost" type="text" placeholder="Dit navn" required></label>
         <label>Beskrivelse<textarea id="initiativeText" rows="5" placeholder="Skriv kort hvad aktiviteten går ud på" required></textarea></label>
         <button class="btn primary wide-btn" type="submit">Send forslag</button>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="initiativeSubmitModal" class="sheet-dialog">
+    <div class="sheet">
+      <button class="close" data-close-submit-initiative aria-label="Luk">×</button>
+      <div class="section-title"><span></span><h2>Foreslå initiativ</h2></div>
+      <p class="form-help">Forslaget sendes til godkendelse, før det bliver synligt i appen.</p>
+      <form id="initiativeSubmitForm" class="initiative-form">
+        <label>Titel<input id="newInitiativeTitle" type="text" placeholder="F.eks. Gåtur i Lystskoven" required></label>
+        <label>Dato<input id="newInitiativeDate" type="date" required></label>
+        <label>Tidspunkt<input id="newInitiativeTime" type="time"></label>
+        <label>Sted<input id="newInitiativePlace" type="text" placeholder="F.eks. Slagelse Lystskov"></label>
+        <label>Kontaktperson<input id="newInitiativeHost" type="text" placeholder="Dit navn" required></label>
+        <label>Beskrivelse<textarea id="newInitiativeText" rows="5" placeholder="Skriv kort hvad aktiviteten går ud på" required></textarea></label>
+        <button id="submitInitiativeButton" class="btn primary wide-btn" type="submit">Send forslag</button>
+        <p id="initiativeSubmitStatus" class="form-status" aria-live="polite"></p>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="joinModal" class="sheet-dialog">
+    <div class="sheet">
+      <button class="close" data-close-join aria-label="Luk">×</button>
+      <div class="section-title"><span></span><h2>Jeg deltager</h2></div>
+      <p id="joinActivityTitle" class="form-help"></p>
+      <form id="joinForm" class="initiative-form">
+        <input id="joinActivityId" type="hidden">
+        <input id="joinActivityName" type="hidden">
+        <label>Dit navn<input id="joinName" type="text" placeholder="Skriv dit navn" required></label>
+        <button id="joinSubmitButton" class="btn primary wide-btn" type="submit">Tilmeld mig</button>
+        <p id="joinStatus" class="form-status" aria-live="polite"></p>
       </form>
     </div>
   </dialog>
