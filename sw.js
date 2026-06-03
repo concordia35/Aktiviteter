@@ -1,4 +1,4 @@
-const CACHE_NAME = 'concordia-v34';
+const CACHE_NAME = 'concordia-v35';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,7 @@ const ASSETS = [
   './assets/sct-michaels-nat-2026.png',
   './assets/sct-patricks-day-2027.png',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
   './assets/chainlinks.svg',
   './assets/vm-aabningskamp-2026.svg',
   './assets/vm-gruppekamp-2026.svg',

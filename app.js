@@ -297,12 +297,23 @@ function normalizeKey(value){
     .replace(/\s+/g, ' ');
 }
 
+function firstValue(row, keys){
+  for(const key of keys){
+    if(row && row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return row[key];
+  }
+  return '';
+}
+
 function participantActivityValue(row){
-  return row.activityId || row['Aktivitet ID'] || row.activity || row.aktivitet || row['Hvilken aktivitet?'] || row['Aktivitet'] || row['Titel på aktiviteten'] || row['Titel'] || '';
+  return firstValue(row, [
+    'activityId', 'Aktivitet ID', 'Aktivitets ID', 'id',
+    'activity', 'aktivitet', 'Hvilken aktivitet?', 'Aktivitet',
+    'Titel på aktiviteten', 'Titel', 'Initiativ', 'Initiativ titel'
+  ]);
 }
 
 function participantNameValue(row){
-  return row.name || row.navn || row['Dit navn'] || row['Navn'] || row['Navn på kontaktperson'] || '';
+  return firstValue(row, ['name', 'navn', 'Dit navn', 'Navn', 'Navn på kontaktperson', 'Kontaktperson']);
 }
 
 
@@ -404,8 +415,9 @@ async function refreshParticipants(){
   try{
     appDataCache = null;
     const data = await getAppData(true);
-    initiativer = Array.isArray(data.initiatives) ? data.initiatives : initiativer;
-    participants = Array.isArray(data.participants) ? data.participants : [];
+    const loadedInitiatives = normalizeInitiatives(data.initiatives);
+    if(loadedInitiatives.length) initiativer = loadedInitiatives;
+    participants = normalizeParticipants(data.participants);
     renderInitiatives();
     return true;
   }catch(err){
@@ -420,10 +432,10 @@ function participantsFor(initiative){
     initiative.title,
     initiative.title + ' - ' + (initiative.date || ''),
     initiative.title + ' – ' + (initiative.date || '')
-  ].map(normalizeKey);
+  ].map(normalizeKey).filter(Boolean);
 
   const names = participants
-    .filter(p => possible.includes(normalizeKey(p.activity)))
+    .filter(p => possible.includes(normalizeKey(p.activityId)) || possible.includes(normalizeKey(p.activity)))
     .map(p => p.name)
     .filter(Boolean);
 
@@ -562,11 +574,62 @@ function isApproved(status){
   return s === 'godkendt' || s === 'ja' || s === 'approved';
 }
 
+
+function makeInitiativeId(row, index){
+  const existing = firstValue(row, ['id', 'ID', 'Initiativ ID', 'Aktivitet ID', 'activityId']);
+  if(existing) return String(existing).trim();
+
+  const title = firstValue(row, ['title', 'Titel på aktiviteten', 'Titel', 'Initiativ', 'Aktivitet']);
+  const date = normalizeDate(firstValue(row, ['date', 'Dato for aktiviteten', 'Dato', 'Hvornår?']));
+  const base = normalizeKey(`${title}-${date}`).replace(/[^a-z0-9æøå -]/g, '').replace(/\s+/g, '-');
+  return base || `sheet-${index}`;
+}
+
+function normalizeInitiativeRecord(row, index=0){
+  const status = firstValue(row, ['status', 'Status', 'Godkendt', 'godkendt', 'Approved']);
+  const date = normalizeDate(firstValue(row, ['date', 'Dato for aktiviteten', 'Dato', 'Hvornår?', 'Dato/tid']));
+  const title = firstValue(row, ['title', 'Titel på aktiviteten', 'Titel', 'Initiativ', 'Aktivitet']);
+
+  return {
+    id: makeInitiativeId(row, index),
+    icon: firstValue(row, ['icon', 'Ikon']) || '🤝',
+    status,
+    title: title || 'Uden titel',
+    date,
+    time: normalizeTime(firstValue(row, ['time', 'Tidspunkt', 'Tid', 'Klokkeslæt'])),
+    place: firstValue(row, ['place', 'Sted', 'Lokation']),
+    host: firstValue(row, ['host', 'Navn på kontaktperson', 'Kontaktperson', 'Navn', 'Oprettet af']),
+    text: firstValue(row, ['text', 'Beskrivelse af aktiviteten', 'Beskrivelse', 'Tekst'])
+  };
+}
+
+function normalizeInitiatives(items){
+  return (Array.isArray(items) ? items : [])
+    .map((row, index) => normalizeInitiativeRecord(row, index))
+    .filter(e => isApproved(e.status))
+    .filter(e => e.title && e.date);
+}
+
+function normalizeParticipantRecord(row){
+  return {
+    activityId: firstValue(row, ['activityId', 'Aktivitet ID', 'Aktivitets ID', 'id']),
+    activity: participantActivityValue(row),
+    name: participantNameValue(row)
+  };
+}
+
+function normalizeParticipants(items){
+  return (Array.isArray(items) ? items : [])
+    .map(normalizeParticipantRecord)
+    .filter(p => (p.activityId || p.activity) && p.name);
+}
+
 async function loadInitiativesFromSheet(){
   try{
     const data = await getAppData(true);
-    const items = Array.isArray(data.initiatives) ? data.initiatives : [];
+    const items = normalizeInitiatives(data.initiatives);
     if(items.length) return items;
+    console.warn('Apps Script returnerede ingen godkendte initiativer. Prøver CSV fallback.');
   }catch(err){
     console.warn('Apps Script initiativer fejlede:', err);
   }
@@ -576,12 +639,20 @@ async function loadInitiativesFromSheet(){
 async function loadParticipantsFromSheet(){
   try{
     const data = await getAppData();
-    return Array.isArray(data.participants) ? data.participants : [];
+    const items = normalizeParticipants(data.participants);
+    if(items.length) return items;
   }catch(err){
     console.warn('Apps Script deltagere fejlede:', err);
+  }
+
+  try{
     return await loadParticipantsFromCsvFallback();
+  }catch(err){
+    console.warn('CSV fallback for deltagere fejlede:', err);
+    return [];
   }
 }
+
 
 
 
@@ -612,25 +683,7 @@ async function loadInitiativesFromCsvFallback(){
   if(rows.length < 2) return [];
 
   const headers = rows[0].map(h => h.trim());
-  return rows.slice(1)
-    .map((row, index) => {
-      const r = rowToObject(headers, row);
-      const status = r['Godkendt'] || r['Status'] || '';
-      const date = normalizeDate(r['Dato for aktiviteten']);
-      return {
-        id: 'sheet-' + index,
-        icon: '🤝',
-        status,
-        title: r['Titel på aktiviteten'] || 'Uden titel',
-        date,
-        time: normalizeTime(r['Tidspunkt']),
-        place: r['Sted'] || '',
-        host: r['Navn på kontaktperson'] || '',
-        text: r['Beskrivelse af aktiviteten'] || ''
-      };
-    })
-    .filter(e => isApproved(e.status))
-    .filter(e => e.title && e.date);
+  return normalizeInitiatives(rows.slice(1).map((row, index) => rowToObject(headers, row)));
 }
 
 async function loadParticipantsFromCsvFallback(){
@@ -642,15 +695,7 @@ async function loadParticipantsFromCsvFallback(){
   if(rows.length < 2) return [];
 
   const headers = rows[0].map(h => h.trim());
-  return rows.slice(1)
-    .map(row => {
-      const r = rowToObject(headers, row);
-      return {
-        activity: participantActivityValue(r),
-        name: participantNameValue(r)
-      };
-    })
-    .filter(p => p.activity && p.name);
+  return normalizeParticipants(rows.slice(1).map(row => rowToObject(headers, row)));
 }
 
 
@@ -663,7 +708,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=34', {cache:'no-store'});
+  const res = await fetch(path + '?v=35', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
@@ -690,24 +735,14 @@ async function init(){
   }
 
   try{
-    const data = await getAppData(true);
-    initiativer = Array.isArray(data.initiatives) ? data.initiatives : [];
-    participants = Array.isArray(data.participants) ? data.participants : [];
+    [initiativer, participants] = await Promise.all([
+      loadInitiativesFromSheet(),
+      loadParticipantsFromSheet()
+    ]);
   }catch(err){
-    console.warn('Kunne ikke indlæse data fra Apps Script. Bruger CSV fallback:', err);
-    try{
-      initiativer = await loadInitiativesFromCsvFallback();
-    }catch(csvErr){
-      console.warn('Kunne ikke indlæse initiativer fra CSV:', csvErr);
-      initiativer = [];
-    }
-
-    try{
-      participants = await loadParticipantsFromCsvFallback();
-    }catch(csvErr){
-      console.warn('Kunne ikke indlæse deltagere fra CSV:', csvErr);
-      participants = [];
-    }
+    console.warn('Kunne ikke indlæse initiativdata:', err);
+    initiativer = [];
+    participants = [];
   }
 
   renderAll();
