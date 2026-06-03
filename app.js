@@ -693,6 +693,166 @@ window.refreshInitiativeParticipants = async function(id){
 }
 
 
+/* === GOOGLE SHEETS INITIATIVER FIX - 2026-06-03 ===
+   Kun Google Sheets/Apps Script. Ingen lokal fallback for initiativer.
+   Frontend accepterer både:
+   1) { ok:true, initiatives:[...], participants:[...] }
+   2) { ok:true, data:[...] }
+   3) [...]
+   og både danske/originale kolonnenavne samt normaliserede felter.
+*/
+function pickArray(data, keys){
+  if(Array.isArray(data)) return data;
+  if(!data || typeof data !== 'object') return [];
+  for(const key of keys){
+    if(Array.isArray(data[key])) return data[key];
+  }
+  for(const value of Object.values(data)){
+    if(Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+async function fetchAppsScriptAction(action='list', force=false){
+  const cacheKey = action || 'list';
+  if(!window.__appsScriptCache) window.__appsScriptCache = {};
+  if(window.__appsScriptCache[cacheKey] && !force) return window.__appsScriptCache[cacheKey];
+
+  if(!APPS_SCRIPT_URL){
+    throw new Error('Apps Script URL mangler i app.js');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try{
+    const url = new URL(APPS_SCRIPT_URL);
+    if(action) url.searchParams.set('action', action);
+    url.searchParams.set('_', Date.now());
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      cache: 'no-store',
+      signal: controller.signal
+    });
+
+    if(!res.ok) throw new Error('Apps Script HTTP ' + res.status);
+    const data = await res.json();
+    if(data && data.ok === false) throw new Error(data.error || 'Apps Script returnerede ok:false');
+    window.__appsScriptCache[cacheKey] = data;
+    return data;
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+function normalizeDate(value){
+  const raw = String(value || '').trim();
+  if(!raw) return '';
+
+  let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T].*)?$/);
+  if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+
+  m = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})(?:\s+.*)?$/);
+  if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+
+  m = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+.*)?$/);
+  if(m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+
+  return '';
+}
+
+function normalizeTime(value){
+  const raw = String(value || '').trim();
+  if(!raw) return '';
+
+  let m = raw.match(/(?:^|\s)(\d{1,2})[.:](\d{1,2})(?:[.:](\d{1,2}))?(?:\s|$)/);
+  if(m) return `${String(m[1]).padStart(2,'0')}:${String(m[2]).padStart(2,'0')}`;
+
+  m = raw.match(/T(\d{1,2}):(\d{1,2})/);
+  if(m) return `${String(m[1]).padStart(2,'0')}:${String(m[2]).padStart(2,'0')}`;
+
+  return raw;
+}
+
+function isApproved(status){
+  const s = String(status || '').trim().toLowerCase();
+  return ['godkendt','ja','approved','true','1','ok'].includes(s);
+}
+
+function makeInitiativeId(row, index){
+  const existing = firstValue(row, ['id','ID','Initiativ ID','Aktivitet ID','activityId']);
+  if(existing) return String(existing).trim();
+  const title = firstValue(row, ['title','Titel','Titel på aktiviteten','Initiativ','Aktivitet']);
+  const date = normalizeDate(firstValue(row, ['date','Dato','Dato for aktiviteten','Hvornår?','Dato/tid']));
+  const time = normalizeTime(firstValue(row, ['time','Tid','Tidspunkt','Tidspunkt for aktivitet','Klokkeslæt']));
+  const base = normalizeKey(`${title}-${date}-${time}`).replace(/[^a-z0-9æøå -]/g, '').replace(/\s+/g, '-');
+  return base || `sheet-${index}`;
+}
+
+function normalizeInitiativeRecord(row, index=0){
+  const status = firstValue(row, ['status','Status','Godkendt','godkendt','Approved']);
+  const date = normalizeDate(firstValue(row, ['date','Dato','Dato for aktiviteten','Hvornår?','Dato/tid']));
+  const title = firstValue(row, ['title','Titel','Titel på aktiviteten','Initiativ','Aktivitet']);
+  const host = firstValue(row, ['host','Kontaktperson','Navn på kontaktperson','Navn','Oprettet af']);
+  return {
+    id: makeInitiativeId(row, index),
+    icon: firstValue(row, ['icon','Ikon']) || '🤝',
+    status,
+    title: title || 'Uden titel',
+    date,
+    time: normalizeTime(firstValue(row, ['time','Tid','Tidspunkt','Tidspunkt for aktivitet','Klokkeslæt'])),
+    place: firstValue(row, ['place','Sted','Lokation']),
+    host,
+    text: firstValue(row, ['text','Beskrivelse','Beskrivelse af aktiviteten','Tekst'])
+  };
+}
+
+function normalizeInitiatives(items){
+  return (Array.isArray(items) ? items : [])
+    .map((row, index) => normalizeInitiativeRecord(row, index))
+    .filter(e => isApproved(e.status))
+    .filter(e => e.title && e.date);
+}
+
+function normalizeParticipantRecord(row){
+  return {
+    activityId: firstValue(row, ['activityId','Aktivitet ID','Aktivitets ID','id']),
+    activity: firstValue(row, ['activity','Aktivitet','Titel','Titel på aktiviteten','Initiativ']),
+    name: firstValue(row, ['name','Navn','Dit navn'])
+  };
+}
+
+function normalizeParticipants(items){
+  return (Array.isArray(items) ? items : [])
+    .map(normalizeParticipantRecord)
+    .filter(p => (p.activityId || p.activity) && p.name);
+}
+
+async function loadInitiativesFromSheet(force=false){
+  // Prøv specifik action først. Hvis Apps Script ikke har den, læses den samlede list.
+  let data;
+  try{
+    data = await fetchAppsScriptAction('getInitiatives', force);
+  }catch(err){
+    data = await fetchAppsScriptAction('list', true);
+  }
+  const rows = arrayRowsToObjects(pickArray(data, ['initiatives','initiativer','Initiativer','items','data','rows']));
+  return normalizeInitiatives(rows);
+}
+
+async function loadParticipantsFromSheet(force=false){
+  let data;
+  try{
+    data = await fetchAppsScriptAction('getParticipants', force);
+  }catch(err){
+    data = await fetchAppsScriptAction('list', true);
+  }
+  const rows = arrayRowsToObjects(pickArray(data, ['participants','deltagere','Deltagere','items','data','rows']));
+  return normalizeParticipants(rows);
+}
+
+
 function renderAll(){
   renderEventHero();
   renderEventList();
@@ -702,7 +862,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=35', {cache:'no-store'});
+  const res = await fetch(path + '?v=101', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }

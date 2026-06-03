@@ -1,27 +1,7 @@
-const CACHE_NAME = 'concordia-aktiviteter-v42-sheets-fix';
+const CACHE_NAME = 'concordia-aktiviteter-v101-network-first';
 const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './events.json',
-  './logeaftener.json',
-  './initiativer.json',
-  './manifest.webmanifest',
-  './assets/vm-i-logen-2026.png',
-  './assets/loppemarked-2026.png',
-  './assets/sct-michaels-nat-2026.png',
-  './assets/sct-patricks-day-2027.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './assets/chainlinks.svg',
-  './assets/vm-aabningskamp-2026.svg',
-  './assets/vm-gruppekamp-2026.svg',
-  './assets/vm-finale-2026.svg',
-  './assets/chainlinks.jpg',
-  './assets/vm-aabningskamp-2026.png',
-  './assets/vm-gruppekamp-2026.png',
-  './assets/vm-finale-2026.png',
+  './','./index.html','./style.css','./app.js','./events.json','./logeaftener.json','./manifest.webmanifest',
+  './assets/chainlinks.jpg','./assets/chainlinks.svg','./icons/icon-192.png','./icons/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
@@ -30,26 +10,19 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.map(key => key === CACHE_NAME ? null : caches.delete(key))))
-  );
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(key => key === CACHE_NAME ? null : caches.delete(key)))));
   self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  if(url.pathname.endsWith('.json')){
-    event.respondWith(
-      fetch(event.request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        return response;
-      }).catch(() => caches.match(event.request))
-    );
-    return;
-  }
+  if(url.hostname.includes('script.google.com')) return;
 
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
+    fetch(event.request).then(response => {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
