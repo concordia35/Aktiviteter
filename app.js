@@ -38,9 +38,10 @@ let initiativer = [];
 let participants = [];
 let currentFilter = 'all';
 
-const INITIATIVE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRkJKdrVC23QTs_9qcuTQ51jFl1z5-nOUgVIFhKwzlB99CXgLHK3uJjyOz4f-_nJeMxpF6FynIlyvLx/pub?output=csv';
+const GOOGLE_SHEET_ID = '1QCnVFk5PzcF_3N6ONFNwzmjCUU-KzBeXFpfyueWa2Jc';
+const INITIATIVE_SHEET_NAME = 'Initiativer';
+const PARTICIPANTS_SHEET_NAME = 'Deltagere';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyDR5b7Tcd1ka28oQV3Wc-Ja1saDRvUi10KEp0KMGmaeVuWhMCXmRW1Hd7CXrpc9Fw/exec';
-const PARTICIPANTS_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2gW_OJRwMUK0qo7thrEiiqLj3rcWCKlZcl-4mjo6tkMmuRyNdyD_nGOwzGlFMPccQ-HytwFJfNI80/pub?output=csv';
 const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfvSDx6diX77ZzmuZTMGRPvKFZ4B_wb-EKYFfOXYQtDNiMiUQ/viewform';
 const PARTICIPATION_ACTIVITY_ENTRY = 'entry.1746932510';
 const PARTICIPATION_NAME_ENTRY = 'entry.383752271';
@@ -304,6 +305,26 @@ function firstValue(row, keys){
   return '';
 }
 
+function sheetCsvUrl(sheetName){
+  const url = new URL(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq`);
+  url.searchParams.set('tqx', 'out:csv');
+  url.searchParams.set('sheet', sheetName);
+  url.searchParams.set('v', Date.now());
+  return url.toString();
+}
+
+async function fetchSheetRows(sheetName){
+  const res = await fetch(sheetCsvUrl(sheetName), {cache:'no-store'});
+  if(!res.ok) throw new Error(`${sheetName} kunne ikke indlæses fra Google Sheets`);
+
+  const csv = await res.text();
+  const rows = parseCsv(csv);
+  if(rows.length < 2) return [];
+
+  const headers = rows[0].map(h => h.trim());
+  return rows.slice(1).map(row => rowToObject(headers, row));
+}
+
 function participantActivityValue(row){
   return firstValue(row, [
     'activityId', 'Aktivitet ID', 'Aktivitets ID', 'id',
@@ -413,15 +434,11 @@ async function getAppData(force=false){
 
 async function refreshParticipants(){
   try{
-    appDataCache = null;
-    const data = await getAppData(true);
-    const loadedInitiatives = normalizeInitiatives(data.initiatives);
-    if(loadedInitiatives.length) initiativer = loadedInitiatives;
-    participants = normalizeParticipants(data.participants);
+    participants = await loadParticipantsFromSheet();
     renderInitiatives();
     return true;
   }catch(err){
-    console.warn('Kunne ikke opdatere deltagerlisten:', err);
+    console.warn('Kunne ikke opdatere deltagerlisten fra Google Sheets:', err);
     return false;
   }
 }
@@ -531,21 +548,21 @@ function normalizeDate(value){
   const raw = String(value || '').trim();
   if(!raw) return '';
 
-  // Google Sheets CSV normally returns Danish dates as dd/mm/yyyy.
-  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // Google Sheets kan sende både rene datoer og dato + klokkeslæt.
+  const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+.*)?$/);
   if(slash){
     const [, d, m, y] = slash;
     return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   }
 
-  const dash = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  const dash = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+.*)?$/);
   if(dash){
     const [, d, m, y] = dash;
     return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   }
 
-  // Already ISO
-  if(/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[ T].*)?$/);
+  if(iso) return iso[1];
 
   return '';
 }
@@ -554,10 +571,10 @@ function normalizeTime(value){
   const raw = String(value || '').trim();
   if(!raw) return '';
 
-  // Examples: 22.11.00, 22:11:00, 22:11
-  const match = raw.match(/^(\d{1,2})[.:](\d{2})(?:[.:]\d{2})?$/);
+  // Eksempler: 22.11.00, 22:11:00, 22:11, 13.2
+  const match = raw.match(/^(\d{1,2})[.:](\d{1,2})(?:[.:]\d{1,2})?$/);
   if(match){
-    return `${String(match[1]).padStart(2,'0')}:${match[2]}`;
+    return `${String(match[1]).padStart(2,'0')}:${String(match[2]).padStart(2,'0')}`;
   }
 
   return raw;
@@ -625,33 +642,16 @@ function normalizeParticipants(items){
 }
 
 async function loadInitiativesFromSheet(){
-  try{
-    const data = await getAppData(true);
-    const items = normalizeInitiatives(data.initiatives);
-    if(items.length) return items;
-    console.warn('Apps Script returnerede ingen godkendte initiativer. Prøver CSV fallback.');
-  }catch(err){
-    console.warn('Apps Script initiativer fejlede:', err);
-  }
-  return await loadInitiativesFromCsvFallback();
+  const rows = await fetchSheetRows(INITIATIVE_SHEET_NAME);
+  const items = normalizeInitiatives(rows);
+  return items;
 }
 
 async function loadParticipantsFromSheet(){
-  try{
-    const data = await getAppData();
-    const items = normalizeParticipants(data.participants);
-    if(items.length) return items;
-  }catch(err){
-    console.warn('Apps Script deltagere fejlede:', err);
-  }
-
-  try{
-    return await loadParticipantsFromCsvFallback();
-  }catch(err){
-    console.warn('CSV fallback for deltagere fejlede:', err);
-    return [];
-  }
+  const rows = await fetchSheetRows(PARTICIPANTS_SHEET_NAME);
+  return normalizeParticipants(rows);
 }
+
 
 
 
@@ -671,31 +671,6 @@ window.refreshInitiativeParticipants = async function(id){
       ? 'Deltagerlisten er opdateret.'
       : 'Deltagerlisten kunne ikke opdateres lige nu.';
   }
-}
-
-
-async function loadInitiativesFromCsvFallback(){
-  const res = await fetch(INITIATIVE_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
-  if(!res.ok) throw new Error('Google Sheets CSV kunne ikke indlæses');
-
-  const csv = await res.text();
-  const rows = parseCsv(csv);
-  if(rows.length < 2) return [];
-
-  const headers = rows[0].map(h => h.trim());
-  return normalizeInitiatives(rows.slice(1).map((row, index) => rowToObject(headers, row)));
-}
-
-async function loadParticipantsFromCsvFallback(){
-  const res = await fetch(PARTICIPANTS_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
-  if(!res.ok) throw new Error('Deltagerliste kunne ikke indlæses');
-
-  const csv = await res.text();
-  const rows = parseCsv(csv);
-  if(rows.length < 2) return [];
-
-  const headers = rows[0].map(h => h.trim());
-  return normalizeParticipants(rows.slice(1).map(row => rowToObject(headers, row)));
 }
 
 
