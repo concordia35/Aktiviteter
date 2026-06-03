@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Concordia" />
   <title>Det sker i Concordia</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.webmanifest?v=1.0.0" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=1.0.0" />
+  <link rel="stylesheet" href="style.css?v=1.0.0" />
 </head>
 <body>
   <div id="loadingScreen" class="loading-screen" role="status" aria-live="polite">
@@ -20,6 +20,11 @@
       <div class="loading-text">Henter aktiviteter...</div>
       <div class="loading-spinner" aria-hidden="true"></div>
     </div>
+  </div>
+
+  <div id="updateBanner" class="update-banner" hidden>
+    <span>Ny version er klar.</span>
+    <button id="updateNowBtn" type="button">Opdater nu</button>
   </div>
 
 
@@ -101,6 +106,7 @@
         <p>Her kan du se kommende aktiviteter, finde datoer for logeaftener og lægge aftener direkte i din kalender.</p>
         <p>Formålet er enkelt: mindre roden rundt i gamle mails og opslag – mere overblik på mobilen.</p>
         <p>Appen samler både de sociale aktiviteter uden for den normale logedrift og de faste logeaftener.</p>
+        <p class="app-version">Version <span id="appVersion">1.0.0</span></p>
         <p class="warning">Intern side for brødrene i Concordia – del ikke offentligt.</p>
       </section>
     </main>
@@ -178,6 +184,6 @@
     </div>
   </dialog>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=1.0.0"></script>
 </body>
 </html>

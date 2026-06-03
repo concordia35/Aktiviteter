@@ -1,3 +1,4 @@
+const APP_VERSION = '1.0.0';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -1055,8 +1056,59 @@ installBtn.addEventListener('click', async () => {
   installBtn.hidden = true;
 });
 
+const appVersion = $('#appVersion');
+if(appVersion) appVersion.textContent = APP_VERSION;
+
+const updateBanner = $('#updateBanner');
+const updateNowBtn = $('#updateNowBtn');
+let waitingWorker = null;
+let refreshing = false;
+
+function showUpdateBanner(worker){
+  waitingWorker = worker;
+  if(updateBanner) updateBanner.hidden = false;
+}
+
+if(updateNowBtn){
+  updateNowBtn.addEventListener('click', () => {
+    if(waitingWorker){
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    }else{
+      location.reload();
+    }
+  });
+}
+
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+  window.addEventListener('load', async () => {
+    try{
+      const registration = await navigator.serviceWorker.register('sw.js?v=' + APP_VERSION);
+
+      if(registration.waiting){
+        showUpdateBanner(registration.waiting);
+      }
+
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if(!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+            showUpdateBanner(newWorker);
+          }
+        });
+      });
+
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if(refreshing) return;
+        refreshing = true;
+        location.reload();
+      });
+
+      setTimeout(() => registration.update(), 3000);
+    }catch(err){
+      console.error('Service worker kunne ikke registreres', err);
+    }
+  });
 }
 
 init();

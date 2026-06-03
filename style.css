@@ -449,3 +449,43 @@ summary{font-weight:900;color:var(--red);cursor:pointer}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+
+.update-banner{
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: calc(78px + env(safe-area-inset-bottom));
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #78101d;
+  color: #fff8eb;
+  box-shadow: 0 16px 34px rgba(50, 16, 18, .25);
+  font-weight: 800;
+}
+
+.update-banner[hidden]{
+  display: none;
+}
+
+.update-banner button{
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: #f1c96b;
+  color: #401017;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.app-version{
+  margin-top: 16px;
+  font-size: .86rem;
+  color: var(--muted);
+  text-align: center;
+}
