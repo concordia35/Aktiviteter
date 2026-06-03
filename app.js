@@ -305,31 +305,61 @@ function firstValue(row, keys){
   return '';
 }
 
-async function fetchAppsScriptData(force=false){
-  if(appDataCache && !force) return appDataCache;
+async function fetchAppsScriptAction(action, force=false){
+  const cacheKey = action || 'default';
+  if(!window.__appsScriptCache) window.__appsScriptCache = {};
+  if(window.__appsScriptCache[cacheKey] && !force) return window.__appsScriptCache[cacheKey];
+
   if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INDSAET_DIN_APPS_SCRIPT')){
     throw new Error('Apps Script URL mangler i app.js');
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try{
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=list&t=${Date.now()}`, {
+    const url = new URL(APPS_SCRIPT_URL);
+    if(action) url.searchParams.set('action', action);
+    url.searchParams.set('t', Date.now());
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
       cache: 'no-store',
       signal: controller.signal
     });
 
+    if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    if(!data || data.ok === false){
-      throw new Error((data && data.error) || 'Apps Script returnerede fejl');
+    if(data && data.ok === false){
+      throw new Error(data.error || 'Apps Script returnerede fejl');
     }
 
-    appDataCache = data;
-    return appDataCache;
+    window.__appsScriptCache[cacheKey] = data;
+    return data;
   }finally{
     clearTimeout(timeout);
   }
+}
+
+function extractRows(data, names){
+  if(Array.isArray(data)) return data;
+  for(const name of names){
+    if(Array.isArray(data && data[name])) return data[name];
+  }
+  if(Array.isArray(data && data.data)) return data.data;
+  if(Array.isArray(data && data.rows)) return data.rows;
+  if(data && typeof data === 'object'){
+    for(const value of Object.values(data)){
+      if(Array.isArray(value)) return value;
+    }
+  }
+  return [];
+}
+
+async function fetchAppsScriptData(force=false){
+  // Beholdes kun som kompatibilitet til resten af filen.
+  // Initiativer skal læses via den nye doGet-action: getInitiatives.
+  return await fetchAppsScriptAction('getInitiatives', force);
 }
 
 function rowsFromData(data, names){
@@ -378,6 +408,7 @@ async function postToAppsScript(action, payload){
   }
 
   appDataCache = null;
+  window.__appsScriptCache = {};
   return data;
 }
 
@@ -407,15 +438,27 @@ async function getAppData(force=false){
 }
 
 async function loadInitiativesFromSheet(force=false){
-  const data = await getAppData(force);
-  const rows = arrayRowsToObjects(rowsFromData(data, ['initiatives', 'initiativer', 'Initiativer']));
+  const data = await fetchAppsScriptAction('getInitiatives', force);
+  const rows = arrayRowsToObjects(extractRows(data, ['initiatives', 'initiativer', 'Initiativer', 'items']));
   return normalizeInitiatives(rows);
 }
 
 async function loadParticipantsFromSheet(force=false){
-  const data = await getAppData(force);
-  const rows = arrayRowsToObjects(rowsFromData(data, ['participants', 'deltagere', 'Deltagere', 'rows']));
-  return normalizeParticipants(rows);
+  // Nogle Apps Scripts har ikke en særskilt getParticipants endnu.
+  // Derfor prøver vi først den rigtige action og derefter den gamle samlede list-action.
+  try{
+    const data = await fetchAppsScriptAction('getParticipants', force);
+    const rows = arrayRowsToObjects(extractRows(data, ['participants', 'deltagere', 'Deltagere', 'rows']));
+    return normalizeParticipants(rows);
+  }catch(err){
+    try{
+      const data = await fetchAppsScriptAction('list', force);
+      const rows = arrayRowsToObjects(extractRows(data, ['participants', 'deltagere', 'Deltagere', 'rows']));
+      return normalizeParticipants(rows);
+    }catch(_err){
+      return [];
+    }
+  }
 }
 
 async function refreshParticipants(){
@@ -692,9 +735,8 @@ async function init(){
   }
 
   try{
-    const sheetData = await getAppData(true);
-    initiativer = normalizeInitiatives(arrayRowsToObjects(rowsFromData(sheetData, ['initiatives', 'initiativer', 'Initiativer'])));
-    participants = normalizeParticipants(arrayRowsToObjects(rowsFromData(sheetData, ['participants', 'deltagere', 'Deltagere', 'rows'])));
+    initiativer = await loadInitiativesFromSheet(true);
+    participants = await loadParticipantsFromSheet(true);
     renderInitiatives();
   }catch(err){
     console.warn('Kunne ikke indlæse initiativdata:', err);
@@ -758,6 +800,7 @@ if(initiativeSubmitForm){
       await postToAppsScript('submitInitiative', payload);
       initiativeSubmitStatus.textContent = '✓ Forslaget er sendt til godkendelse.';
       appDataCache = null;
+      window.__appsScriptCache = {};
       initiativeSubmitForm.reset();
       setTimeout(() => initiativeSubmitModal.close(), 1200);
     }catch(err){
