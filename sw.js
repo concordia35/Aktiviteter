@@ -1,4 +1,4 @@
-const CACHE_NAME = 'concordia-aktiviteter-v102-sheets-reset';
+const CACHE_NAME = 'concordia-aktiviteter-v103-initiatives-polish';
 const ASSETS = [
   './','./index.html','./style.css','./app.js','./events.json','./logeaftener.json','./manifest.webmanifest',
   './assets/chainlinks.jpg','./assets/chainlinks.svg','./icons/icon-192.png','./icons/icon-512.png'

@@ -428,3 +428,24 @@ summary{font-weight:900;color:var(--red);cursor:pointer}
     max-height: 90svh;
   }
 }
+
+/* V103 - små rettelser til initiativer */
+.initiative-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mini-spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(120,16,29,.18);
+  border-top-color: #78101d;
+  border-radius: 50%;
+  animation: spin .85s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -36,6 +36,7 @@ let events = [];
 let logeaftener = [];
 let initiativer = [];
 let participants = [];
+let initiativesLoading = true;
 let currentFilter = 'all';
 
 const GOOGLE_SHEET_ID = '1QCnVFk5PzcF_3N6ONFNwzmjCUU-KzBeXFpfyueWa2Jc';
@@ -498,6 +499,11 @@ function participantsFor(initiative){
 
 function renderInitiatives(){
   if(!initiativeList) return;
+  if(initiativesLoading){
+    initiativeList.innerHTML = `<div class="empty initiative-loading"><span class="mini-spinner" aria-hidden="true"></span> Henter initiativer...</div>`;
+    if(pastInitiativeBlock) pastInitiativeBlock.hidden = true;
+    return;
+  }
   const items = upcomingInitiatives();
   initiativeList.innerHTML = items.length ? items.map(e => {
     const names = participantsFor(e);
@@ -522,6 +528,19 @@ function renderInitiatives(){
   }
 }
 
+
+function initiativeCalendarUrl(item){
+  if(!item || !item.date) return '#';
+  const startTime = item.time || '19:00';
+  const endTime = addMinutes(startTime, 90);
+  const start = item.date.replaceAll('-','') + 'T' + startTime.replace(':','') + '00';
+  const end = item.date.replaceAll('-','') + 'T' + endTime.replace(':','') + '00';
+  const text = encodeURIComponent(item.title || 'Broderinitiativ');
+  const details = encodeURIComponent(`${item.text || ''}\n\nKontaktperson: ${item.host || ''}`.trim());
+  const location = encodeURIComponent(item.place || '');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${start}/${end}&details=${details}&location=${location}`;
+}
+
 window.openInitiative = function(id){
   const e = initiativeById(id); if(!e) return;
   const names = participantsFor(e);
@@ -541,9 +560,10 @@ window.openInitiative = function(id){
     <p class="description">${e.text || ''}</p>
     ${participantList}
     <div class="modal-actions">
-      <button class="btn primary" type="button" onclick="openJoinForInitiative(\'${e.id}\')">Jeg deltager</button><button class="btn soft refresh-btn" type="button" onclick="refreshInitiativeParticipants(\'${e.id}\')">Opdater deltagerliste</button>
+      <button class="btn primary" type="button" onclick="openJoinForInitiative(\'${e.id}\')">Jeg deltager</button>
+      <a class="btn soft" href="${initiativeCalendarUrl(e)}" target="_blank" rel="noopener">Tilføj kalender</a>
     </div>
-    <p class="sheet-status-note">Skriv dit navn direkte i appen. Deltagerlisten opdateres efter tilmelding.</p>`;
+    <p class="sheet-status-note">Skriv dit navn direkte i appen. Deltagerlisten opdateres automatisk efter tilmelding.</p>`;
   modal.showModal();
 }
 
@@ -870,7 +890,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=101', {cache:'no-store'});
+  const res = await fetch(path + '?v=103', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
@@ -905,11 +925,13 @@ async function init(){
   try{
     initiativer = await loadInitiativesFromSheet(true);
     participants = await loadParticipantsFromSheet(true);
+    initiativesLoading = false;
     renderInitiatives();
   }catch(err){
     console.warn('Kunne ikke indlæse initiativdata:', err);
     initiativer = [];
     participants = [];
+    initiativesLoading = false;
     renderInitiatives();
   }
 }
@@ -988,6 +1010,12 @@ if(joinForm){
       activity: joinActivityName.value,
       name: $('#joinName').value.trim()
     };
+    const initiative = initiativeById(payload.activityId);
+    const existingNames = initiative ? participantsFor(initiative).map(normalizeKey) : [];
+    if(existingNames.includes(normalizeKey(payload.name))){
+      joinStatus.textContent = 'Du står allerede på deltagerlisten.';
+      return;
+    }
     joinSubmitButton.disabled = true;
     joinStatus.textContent = 'Sender tilmelding...';
     try{
