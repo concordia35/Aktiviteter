@@ -39,7 +39,7 @@ let participants = [];
 let currentFilter = 'all';
 
 const INITIATIVE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRkJKdrVC23QTs_9qcuTQ51jFl1z5-nOUgVIFhKwzlB99CXgLHK3uJjyOz4f-_nJeMxpF6FynIlyvLx/pub?output=csv';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlSyRNT2rJjyghcyI9X2B1CgotYnCoonB-0IDECekcMRtQ5q-65h6byhllbztd4-hm/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwyDR5b7Tcd1ka28oQV3Wc-Ja1saDRvUi10KEp0KMGmaeVuWhMCXmRW1Hd7CXrpc9Fw/exec';
 const PARTICIPANTS_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2gW_OJRwMUK0qo7thrEiiqLj3rcWCKlZcl-4mjo6tkMmuRyNdyD_nGOwzGlFMPccQ-HytwFJfNI80/pub?output=csv';
 const PARTICIPATION_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfvSDx6diX77ZzmuZTMGRPvKFZ4B_wb-EKYFfOXYQtDNiMiUQ/viewform';
 const PARTICIPATION_ACTIVITY_ENTRY = 'entry.1746932510';
@@ -663,7 +663,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=33', {cache:'no-store'});
+  const res = await fetch(path + '?v=34', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
