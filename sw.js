@@ -1,4 +1,4 @@
-const CACHE_NAME = 'concordia-aktiviteter-v41-sheets-only';
+const CACHE_NAME = 'concordia-aktiviteter-v42-sheets-fix';
 const ASSETS = [
   './',
   './index.html',

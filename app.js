@@ -311,18 +311,25 @@ async function fetchAppsScriptData(force=false){
     throw new Error('Apps Script URL mangler i app.js');
   }
 
-  const url = new URL(APPS_SCRIPT_URL);
-  url.searchParams.set('action', 'list');
-  url.searchParams.set('t', Date.now());
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
-  const res = await fetch(url.toString(), {cache:'no-store'});
-  if(!res.ok) throw new Error('Apps Script kunne ikke hente data');
+  try{
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=list&t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal
+    });
 
-  const data = await res.json();
-  if(!data || data.ok === false) throw new Error((data && data.error) || 'Apps Script returnerede fejl');
+    const data = await res.json();
+    if(!data || data.ok === false){
+      throw new Error((data && data.error) || 'Apps Script returnerede fejl');
+    }
 
-  appDataCache = data;
-  return appDataCache;
+    appDataCache = data;
+    return appDataCache;
+  }finally{
+    clearTimeout(timeout);
+  }
 }
 
 function rowsFromData(data, names){
@@ -357,19 +364,21 @@ async function postToAppsScript(action, payload){
     throw new Error('Apps Script URL mangler i app.js');
   }
 
-  const body = new URLSearchParams();
-  body.set('action', action);
-  Object.entries(payload).forEach(([key, value]) => body.set(key, value ?? ''));
-
-  // no-cors undgår falske fejl fra Google Apps Script.
-  // Data sendes korrekt, men browseren kan ikke læse svaret.
-  await fetch(APPS_SCRIPT_URL, {
+  const res = await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
-    mode: 'no-cors',
-    body
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8'
+    },
+    body: JSON.stringify({ action, ...payload })
   });
 
-  return { ok: true };
+  const data = await res.json();
+  if(!(data.ok || data.success)){
+    throw new Error(data.error || 'Apps Script returnerede fejl');
+  }
+
+  appDataCache = null;
+  return data;
 }
 
 function openJoinDialog(initiative){
@@ -676,20 +685,22 @@ async function init(){
     if(nextLoge) nextLoge.innerHTML = `<div class="empty">Kunne ikke indlæse logeaftener.json.</div>`;
   }
 
-  try{
-    const sheetData = await getAppData(true);
-    initiativer = normalizeInitiatives(arrayRowsToObjects(rowsFromData(sheetData, ['initiatives', 'initiativer', 'Initiativer'])));
-    participants = normalizeParticipants(arrayRowsToObjects(rowsFromData(sheetData, ['participants', 'deltagere', 'Deltagere', 'rows'])));
-  }catch(err){
-    console.warn('Kunne ikke indlæse initiativdata:', err);
-    initiativer = [];
-    participants = [];
-  }
-
   renderAll();
 
   if(loadingScreen){
     setTimeout(() => loadingScreen.classList.add('hidden'), 250);
+  }
+
+  try{
+    const sheetData = await getAppData(true);
+    initiativer = normalizeInitiatives(arrayRowsToObjects(rowsFromData(sheetData, ['initiatives', 'initiativer', 'Initiativer'])));
+    participants = normalizeParticipants(arrayRowsToObjects(rowsFromData(sheetData, ['participants', 'deltagere', 'Deltagere', 'rows'])));
+    renderInitiatives();
+  }catch(err){
+    console.warn('Kunne ikke indlæse initiativdata:', err);
+    initiativer = [];
+    participants = [];
+    renderInitiatives();
   }
 }
 
