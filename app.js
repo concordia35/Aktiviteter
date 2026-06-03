@@ -310,15 +310,20 @@ async function postToAppsScript(action, payload){
   if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INDSAET_DIN_APPS_SCRIPT')){
     throw new Error('Apps Script URL mangler i app.js');
   }
+
   const body = new URLSearchParams();
   body.set('action', action);
   Object.entries(payload).forEach(([key, value]) => body.set(key, value ?? ''));
-  const res = await fetch(APPS_SCRIPT_URL, { method:'POST', body });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = { ok:false, error:text }; }
-  if(!res.ok || !data.ok) throw new Error(data.error || 'Kunne ikke sende data');
-  return data;
+
+  // Google Apps Script giver ofte CORS-problemer, hvis man forsøger at læse svaret.
+  // no-cors sender data korrekt, men svaret bliver "opaque", så vi viser succes efter afsendelse.
+  await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    body
+  });
+
+  return { ok: true };
 }
 
 function openJoinDialog(initiative){
@@ -577,7 +582,7 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=30', {cache:'no-store'});
+  const res = await fetch(path + '?v=30b', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
