@@ -1,4 +1,4 @@
-const CACHE_NAME = 'concordia-v32';
+const CACHE_NAME = 'concordia-v33';
 const ASSETS = [
   './',
   './index.html',
