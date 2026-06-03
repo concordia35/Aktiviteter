@@ -1,6 +1,7 @@
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
+const loadingScreen = $('#loadingScreen');
 
 const eventList = $('#eventList');
 const pastEventList = $('#pastEventList');
@@ -315,8 +316,8 @@ async function postToAppsScript(action, payload){
   body.set('action', action);
   Object.entries(payload).forEach(([key, value]) => body.set(key, value ?? ''));
 
-  // Google Apps Script kan give CORS-fejl, hvis browseren forsøger at læse svaret.
-  // no-cors sender data korrekt til scriptet, men svaret kan ikke læses.
+  // no-cors undgår falske fejl fra Google Apps Script.
+  // Data sendes korrekt, men browseren kan ikke læse svaret.
   await fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors',
@@ -344,10 +345,67 @@ function participationUrl(initiative){
   return url.toString();
 }
 
+
+let appDataCache = null;
+
+function getFromAppsScript(action){
+  return new Promise((resolve, reject) => {
+    if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('INDSAET_DIN_APPS_SCRIPT')){
+      reject(new Error('Apps Script URL mangler i app.js'));
+      return;
+    }
+
+    const callbackName = 'concordiaCallback_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    const script = document.createElement('script');
+    const url = new URL(APPS_SCRIPT_URL);
+
+    url.searchParams.set('action', action);
+    url.searchParams.set('callback', callbackName);
+    url.searchParams.set('v', Date.now());
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Apps Script svarede ikke'));
+    }, 12000);
+
+    function cleanup(){
+      clearTimeout(timer);
+      delete window[callbackName];
+      script.remove();
+    }
+
+    window[callbackName] = data => {
+      cleanup();
+      if(!data || data.ok === false){
+        reject(new Error((data && data.error) || 'Apps Script returnerede fejl'));
+        return;
+      }
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Kunne ikke indlæse Apps Script'));
+    };
+
+    script.src = url.toString();
+    document.body.appendChild(script);
+  });
+}
+
+async function getAppData(force=false){
+  if(appDataCache && !force) return appDataCache;
+  appDataCache = await getFromAppsScript('getData');
+  return appDataCache;
+}
+
+
 async function refreshParticipants(){
   try{
-    participants = await loadParticipantsFromSheet();
-    if(!Array.isArray(participants)) participants = [];
+    appDataCache = null;
+    const data = await getAppData(true);
+    initiativer = Array.isArray(data.initiatives) ? data.initiatives : initiativer;
+    participants = Array.isArray(data.participants) ? data.participants : [];
     renderInitiatives();
     return true;
   }catch(err){
@@ -505,53 +563,13 @@ function isApproved(status){
 }
 
 async function loadInitiativesFromSheet(){
-  const res = await fetch(INITIATIVE_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
-  if(!res.ok) throw new Error('Google Sheets CSV kunne ikke indlæses');
-
-  const csv = await res.text();
-  const rows = parseCsv(csv);
-  if(rows.length < 2) return [];
-
-  const headers = rows[0].map(h => h.trim());
-  return rows.slice(1)
-    .map((row, index) => {
-      const r = rowToObject(headers, row);
-      const status = r['Godkendt'] || r['Status'] || '';
-      const date = normalizeDate(r['Dato for aktiviteten']);
-      return {
-        id: 'sheet-' + index,
-        icon: '🤝',
-        status,
-        title: r['Titel på aktiviteten'] || 'Uden titel',
-        date,
-        time: normalizeTime(r['Tidspunkt']),
-        place: r['Sted'] || '',
-        host: r['Navn på kontaktperson'] || '',
-        text: r['Beskrivelse af aktiviteten'] || ''
-      };
-    })
-    .filter(e => isApproved(e.status))
-    .filter(e => e.title && e.date);
+  const data = await getAppData(true);
+  return Array.isArray(data.initiatives) ? data.initiatives : [];
 }
 
 async function loadParticipantsFromSheet(){
-  const res = await fetch(PARTICIPANTS_SHEET_CSV_URL + '&v=' + Date.now(), {cache:'no-store'});
-  if(!res.ok) throw new Error('Deltagerliste kunne ikke indlæses');
-
-  const csv = await res.text();
-  const rows = parseCsv(csv);
-  if(rows.length < 2) return [];
-
-  const headers = rows[0].map(h => h.trim());
-  return rows.slice(1)
-    .map(row => {
-      const r = rowToObject(headers, row);
-      return {
-        activity: participantActivityValue(r),
-        name: participantNameValue(r)
-      };
-    })
-    .filter(p => p.activity && p.name);
+  const data = await getAppData();
+  return Array.isArray(data.participants) ? data.participants : [];
 }
 
 
@@ -582,12 +600,14 @@ function renderAll(){
 }
 
 async function loadJson(path){
-  const res = await fetch(path + '?v=30c', {cache:'no-store'});
+  const res = await fetch(path + '?v=31', {cache:'no-store'});
   if(!res.ok) throw new Error(path);
   return await res.json();
 }
 
 async function init(){
+  if(loadingScreen) loadingScreen.classList.remove('hidden');
+
   try{
     events = await loadJson('events.json');
     if(!Array.isArray(events)) events = [];
@@ -607,22 +627,20 @@ async function init(){
   }
 
   try{
-    initiativer = await loadInitiativesFromSheet();
-    if(!Array.isArray(initiativer)) initiativer = [];
+    const data = await getAppData(true);
+    initiativer = Array.isArray(data.initiatives) ? data.initiatives : [];
+    participants = Array.isArray(data.participants) ? data.participants : [];
   }catch(err){
-    console.warn('Kunne ikke indlæse initiativer fra Google Sheets:', err);
+    console.warn('Kunne ikke indlæse data fra Apps Script:', err);
     initiativer = [];
-  }
-
-  try{
-    participants = await loadParticipantsFromSheet();
-    if(!Array.isArray(participants)) participants = [];
-  }catch(err){
-    console.warn('Kunne ikke indlæse deltagere fra Google Sheets:', err);
     participants = [];
   }
 
   renderAll();
+
+  if(loadingScreen){
+    setTimeout(() => loadingScreen.classList.add('hidden'), 250);
+  }
 }
 
 if(filterSelect) filterSelect.addEventListener('change', e => {
@@ -678,6 +696,7 @@ if(initiativeSubmitForm){
     try{
       await postToAppsScript('submitInitiative', payload);
       initiativeSubmitStatus.textContent = '✓ Forslaget er sendt til godkendelse.';
+      appDataCache = null;
       initiativeSubmitForm.reset();
       setTimeout(() => initiativeSubmitModal.close(), 1200);
     }catch(err){
@@ -702,6 +721,7 @@ if(joinForm){
     try{
       await postToAppsScript('joinActivity', payload);
       joinStatus.textContent = '✓ Du er tilmeldt.';
+      await new Promise(resolve => setTimeout(resolve, 900));
       await refreshParticipants();
       renderInitiatives();
       setTimeout(() => {
