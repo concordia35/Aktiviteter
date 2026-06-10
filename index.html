@@ -8,9 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Concordia" />
   <title>Det sker i Concordia</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1.0.0" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png?v=1.0.0" />
-  <link rel="stylesheet" href="style.css?v=1.0.0" />
+  <link rel="manifest" href="manifest.webmanifest?v=1.0.1" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png?v=1.0.1" />
+  <link rel="stylesheet" href="style.css?v=1.0.1" />
 </head>
 <body>
   <div id="loadingScreen" class="loading-screen" role="status" aria-live="polite">
@@ -101,12 +101,25 @@
 
     <main id="viewAbout" class="view">
       <section class="page-card">
-        <div class="section-title"><span></span><h2>Om siden</h2></div>
+        <div class="section-title"><span></span><h2>Om</h2></div>
         <p>Denne app er lavet for at give brødrene et samlet og hurtigt overblik over, hvad der sker i Concordia.</p>
         <p>Her kan du se kommende aktiviteter, finde datoer for logeaftener og lægge aftener direkte i din kalender.</p>
         <p>Formålet er enkelt: mindre roden rundt i gamle mails og opslag – mere overblik på mobilen.</p>
         <p>Appen samler både de sociale aktiviteter uden for den normale logedrift og de faste logeaftener.</p>
-        <p class="app-version">Version <span id="appVersion">1.0.0</span></p>
+
+        <div class="about-qr-block" aria-label="QR-kode til siden">
+          <div class="about-qr-text">
+            <h3>QR-kode til siden</h3>
+            <p>Scan koden for hurtigt at åbne siden på mobilen.</p>
+          </div>
+          <figure class="qr-card">
+            <img src="qr.png?v=1.0.1" alt="QR-kode til Det sker i Concordia" loading="lazy" onerror="this.closest('.qr-card').classList.add('qr-missing'); this.hidden=true;">
+            <figcaption>QR-kode</figcaption>
+            <div class="qr-fallback">Læg <strong>qr.png</strong> i samme mappe som <strong>index.html</strong>.</div>
+          </figure>
+        </div>
+
+        <p class="app-version">Version <span id="appVersion">1.0.1</span></p>
         <p class="warning">Intern side for brødrene i Concordia – del ikke offentligt.</p>
       </section>
     </main>
@@ -115,7 +128,7 @@
       <button class="nav-btn active" data-view="overview"><span>▦</span><small>Aktiviteter</small></button>
       <button class="nav-btn" data-view="loge"><span>◆</span><small>Logeaftener</small></button>
       <button class="nav-btn" data-view="initiatives"><span>🤝</span><small>Initiativer</small></button>
-      <button class="nav-btn" data-view="about"><span>ⓘ</span><small>Om siden</small></button>
+      <button class="nav-btn" data-view="about"><span>ⓘ</span><small>Om</small></button>
     </nav>
   </div>
 
@@ -184,6 +197,6 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=1.0.0"></script>
+  <script src="app.js?v=1.0.1"></script>
 </body>
 </html>
